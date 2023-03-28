@@ -6,12 +6,12 @@ on:
       - "main"
 
 env:
-  AWS_REGION: us-east-1                
-  ECR_REPOSITORY: complete_e2e_ecr          
-  ECS_SERVICE: first-ecs-service               
-  ECS_CLUSTER: complete-e2e-cluster               
-  ECS_TASK_DEFINITION: .github/workflows/task-definition.json
-  CONTAINER_NAME: container1         
+  AWS_REGION: ap-south-1                
+  ECR_REPOSITORY: github-poc          
+  #ECS_SERVICE: first-ecs-service               
+  #ECS_CLUSTER: complete-e2e-cluster               
+  #ECS_TASK_DEFINITION: .github/workflows/task-definition.json
+  #CONTAINER_NAME: container1         
                                         
 
 permissions:
@@ -19,21 +19,23 @@ permissions:
   contents: read 
   
 jobs:
-  sonarqube:
-    name: SonarQube Trigger
+  build:
+    name: Build
     runs-on: ubuntu-latest
     steps:
-    - name: Checking out
-      uses: actions/checkout@master
-      with:
-        # Disabling shallow clone is recommended for improving relevancy of reporting
-        fetch-depth: 0
-        
-    - name: SonarQube Scan
-      uses: kitabisa/sonarqube-action@v1.2.0
-      with:
-        host: ${{ secrets.SONARQUBE_HOST }}
-        login: ${{ secrets.SONARQUBE_TOKEN }}
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+      - uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      # If you wish to fail your job when the Quality Gate is red, uncomment the
+      # following lines. This would typically be used to fail a deployment.
+      # - uses: sonarsource/sonarqube-quality-gate-action@master
+      #   timeout-minutes: 5
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   deploy:
     name: Deploy
@@ -48,10 +50,10 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      with:
-        role-to-assume: arn:aws:iam::722581090783:role/ECR-Github-Pipeline
-        role-session-name: Github-ECR
-        aws-region: us-east-1
+     # with:
+       # role-to-assume: arn:aws:iam::722581090783:role/ECR-Github-Pipeline
+       # role-session-name: Github-ECR
+        aws-region: ap-south-1
 
     - name: Login to Amazon ECR
       id: login-ecr
@@ -69,18 +71,18 @@ jobs:
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-    - name: Fill in the new image ID in the Amazon ECS task definition
-      id: task-def
-      uses: aws-actions/amazon-ecs-render-task-definition@v1
-      with:
-        task-definition: ${{ env.ECS_TASK_DEFINITION }}
-        container-name: ${{ env.CONTAINER_NAME }}
-        image: ${{ steps.build-image.outputs.image }}
+   # - name: Fill in the new image ID in the Amazon ECS task definition
+      #id: task-def
+     # uses: aws-actions/amazon-ecs-render-task-definition@v1
+     # with:
+       # task-definition: ${{ env.ECS_TASK_DEFINITION }}
+       # container-name: ${{ env.CONTAINER_NAME }}
+       # image: ${{ steps.build-image.outputs.image }}
 
-    - name: Deploy Amazon ECS task definition
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-      with:
-        task-definition: ${{ steps.task-def.outputs.task-definition }}
-        service: ${{ env.ECS_SERVICE }}
-        cluster: ${{ env.ECS_CLUSTER }}
-        wait-for-service-stability: true
+    #- name: Deploy Amazon ECS task definition
+     # uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+     # with:
+       # task-definition: ${{ steps.task-def.outputs.task-definition }}
+       # service: ${{ env.ECS_SERVICE }}
+       # cluster: ${{ env.ECS_CLUSTER }}
+       # wait-for-service-stability: true
